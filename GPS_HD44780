@@ -1,0 +1,88 @@
+#include <LiquidCrystal.h>
+#include <SoftwareSerial.h>
+#include <TinyGPS++.h>
+
+// Initialize the LCD (using 6 pins: RS, E, D4, D5, D6, D7)
+LiquidCrystal lcd(D4, D3, D2, D1, D0, D5);
+
+// GPS module pins
+#define GPS_RX D6  // GPS TX -> D6 (Wemos RX)
+#define GPS_TX D7  // GPS RX -> D7 (Wemos TX)
+
+// Create TinyGPS++ object for GPS data parsing
+TinyGPSPlus gps;
+
+// Initialize SoftwareSerial for GPS communication
+SoftwareSerial ss(GPS_RX, GPS_TX);
+
+int timezone = 2;  // Time zone adjustment for UTC+2 (e.g., Cape Town)
+unsigned long lastUpdateTime = 0;
+
+void setup() {
+  Serial.begin(115200);  // Debugging via Serial Monitor
+  ss.begin(9600);        // Start communication with GPS module at 9600 baud
+
+  // Initialize the LCD
+  lcd.begin(16, 2);  // LCD is 16x2
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Waiting for GPS...");
+}
+
+void loop() {
+  // Read incoming data from GPS
+  while (ss.available() > 0) {
+    char c = ss.read();
+    gps.encode(c);  // Decode the GPS data
+  }
+
+  // Check if 1 second has passed
+  if (millis() - lastUpdateTime >= 1000) {
+    lastUpdateTime = millis();
+
+    // Display satellite count if no valid time yet
+    if (!gps.time.isValid()) {
+      displaySatellites();  // Show number of satellites connected
+    } else {
+      displayTime();  // Display time on the LCD when valid GPS time is received
+    }
+  }
+}
+
+void displaySatellites() {
+  // Clear the display
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Satellites:");
+
+  // Show the number of satellites connected
+  lcd.setCursor(0, 1);
+  lcd.print(gps.satellites.value());  // Display the number of satellites
+  lcd.print(" connected");
+
+  Serial.print("Satellites: ");
+  Serial.println(gps.satellites.value());  // Debugging in Serial Monitor
+}
+
+void displayTime() {
+  // Adjust the hour for the correct time zone
+  int hour = (gps.time.hour() + timezone) % 24;
+  int minute = gps.time.minute();
+  int second = gps.time.second();
+
+  // Clear the display before updating
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Time:");
+
+  // Display formatted time (HH:MM:SS)
+  lcd.setCursor(0, 1);  // Move to second row for time display
+  if (hour < 10) lcd.print('0');  // Leading zero for hour
+  lcd.print(hour);
+  lcd.print(":");
+  if (minute < 10) lcd.print('0');  // Leading zero for minute
+  lcd.print(minute);
+  lcd.print(":");
+  if (second < 10) lcd.print('0');  // Leading zero for second
+  lcd.print(second);
+}
